@@ -97,12 +97,14 @@ jobs:
         mv temp-changelog.md changelog.md
     
     - name: Commit changes
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         git add changelog.md
         git commit -m "CI: Update changelog for v$(cat version)"
-        git push
+        git push "https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git" HEAD:main
 
   notify:
     needs: build
