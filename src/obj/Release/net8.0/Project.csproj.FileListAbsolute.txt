@@ -1,0 +1,15 @@
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\bin\Release\net8.0\Project.exe
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\bin\Release\net8.0\Project.deps.json
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\bin\Release\net8.0\Project.runtimeconfig.json
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\bin\Release\net8.0\Project.dll
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\bin\Release\net8.0\Project.pdb
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\obj\Release\net8.0\Project.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\obj\Release\net8.0\Project.AssemblyInfoInputs.cache
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\obj\Release\net8.0\Project.AssemblyInfo.cs
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\obj\Release\net8.0\Project.csproj.CoreCompileInputs.cache
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\obj\Release\net8.0\Project.sourcelink.json
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\obj\Release\net8.0\Project.dll
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\obj\Release\net8.0\refint\Project.dll
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\obj\Release\net8.0\Project.pdb
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\obj\Release\net8.0\Project.genruntimeconfig.cache
+C:\Users\Biars\Documents\GitHub\CI-CD-Pipeline\src\obj\Release\net8.0\ref\Project.dll
