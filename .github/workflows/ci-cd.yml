@@ -34,6 +34,9 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '8.0.x'
+        
+    - name: Check vulnerable packages
+      run: dotnet list src/Project.csproj package --vulnerable
     
     - name: Build project
       run: dotnet build src --configuration Release
