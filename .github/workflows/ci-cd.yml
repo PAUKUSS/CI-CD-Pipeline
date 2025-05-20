@@ -81,30 +81,56 @@ jobs:
         echo "$SCAN_RESULT" | jq .
 
   build:
-    needs: security
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Build
-      run: dotnet build src --configuration Release
-    
-    - name: Update changelog
-      run: |
-        echo "## [v$(cat version)] - $(date +'%Y-%m-%d')" > temp-changelog.md
-        echo "- Initial release" >> temp-changelog.md
-        cat changelog.md >> temp-changelog.md
-        mv temp-changelog.md changelog.md
-    
-    - name: Commit changes
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
-        git add changelog.md
-        git commit -m "CI: Update changelog for v$(cat version)"
-        git push "https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git" HEAD:main
+       needs: security
+       runs-on: ubuntu-latest
+        
+       permissions:
+          contents: write
+          pull-requests: write
+        
+       steps:
+        - uses: actions/checkout@v4
+          with:
+            fetch-depth: 0  
+            
+        - name: Setup .NET
+          uses: actions/setup-dotnet@v3
+          with:
+            dotnet-version: '8.0.x'
+        
+        - name: Build
+          run: dotnet build src --configuration Release
+        
+        - name: Update changelog
+          run: |
+            echo "## [v$(cat version)] - $(date +'%Y-%m-%d')" > temp-changelog.md
+            echo "- Build ${GITHUB_RUN_NUMBER}" >> temp-changelog.md
+            echo "- Updated dependencies" >> temp-changelog.md
+            cat changelog.md >> temp-changelog.md
+            mv temp-changelog.md changelog.md
+        
+        - name: Commit and push changes
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          run: |
+            # Настраиваем git
+            git config --global user.name "GitHub Actions"
+            git config --global user.email "actions@github.com"
+            git config --global pull.rebase true
+            
+            # Получаем последние изменения
+            git pull origin main
+            
+            # Коммитим
+            git add changelog.md
+            git commit -m "CI: Update changelog for v$(cat version) [skip ci]"
+            
+            # Push с обработкой возможных ошибок
+            if ! git push "https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git" HEAD:main; then
+              echo "Retrying push after pull..."
+              git pull origin main
+              git push "https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git" HEAD:main
+            fi
 
   notify:
     needs: build
