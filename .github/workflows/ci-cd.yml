@@ -30,16 +30,37 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Build project
+      run: dotnet build src --configuration Release
+    
+    - name: List build artifacts
+      run: ls -la src/bin/Release/net8.0/
+    
     - name: VirusTotal scan
       run: |
-        echo "Сканирование через VirusTotal API"
-        curl -X POST \
+        echo "Starting VirusTotal scan..."
+        FILE_PATH="src/bin/Release/net8.0/Program.dll"  
+        
+        if [ ! -f "$FILE_PATH" ]; then
+          echo "Error: File $FILE_PATH not found!"
+          exit 1
+        fi
+        
+        echo "Scanning $FILE_PATH with VirusTotal..."
+        SCAN_RESULT=$(curl -s -X POST \
           -H "x-apikey: ${{ secrets.VIRUSTOTAL_API_KEY }}" \
-          -F "file=@src/bin/Release/net8.0/your-app.dll" \
-          https://www.virustotal.com/api/v3/files
-
-    
-    - name: Dependency check
+          -F "file=@$FILE_PATH" \
+          https://www.virustotal.com/api/v3/files)
+        
+        echo "Scan results:"
+        echo $SCAN_RESULT | jq .
+        
+    - name: Check vulnerable packages
       run: dotnet list package --vulnerable
 
   build:
