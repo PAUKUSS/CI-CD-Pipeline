@@ -113,24 +113,28 @@ jobs:
           env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           run: |
-            # Настраиваем git
             git config --global user.name "GitHub Actions"
             git config --global user.email "actions@github.com"
-            git config --global pull.rebase true
             
-            # Получаем последние изменения
-            git pull origin main
+            git add -A
             
-            # Коммитим
-            git add changelog.md
-            git commit -m "CI: Update changelog for v$(cat version) [skip ci]"
-            
-            # Push с обработкой возможных ошибок
-            if ! git push "https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git" HEAD:main; then
-              echo "Retrying push after pull..."
-              git pull origin main
-              git push "https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git" HEAD:main
+            if git diff-index --quiet HEAD --; then
+              echo "No changes to commit"
+            else
+              git commit -m "CI: Update changelog for v$(cat version) [skip ci]"
             fi
+            
+            git fetch origin main
+            git reset --hard origin/main
+            
+            if [ -f changelog.md ]; then
+              git checkout origin/main -- changelog.md 2>/dev/null || true
+              cat temp-changelog.md > changelog.md
+              git add changelog.md
+              git commit -m "CI: Update changelog for v$(cat version) [skip ci]"
+            fi
+            
+            git push "https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git" HEAD:main
 
   notify:
     needs: build
