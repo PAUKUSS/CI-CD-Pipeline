@@ -34,12 +34,28 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '8.0.x'
-        
-    - name: Check vulnerable packages
-      run: dotnet list src/Project.csproj package --vulnerable
+    
+    - name: Debug project structure
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Project files:"
+        find . -name "*.csproj"
+        echo "Solution files:"
+        find . -name "*.sln"
     
     - name: Build project
       run: dotnet build src --configuration Release
+    
+    - name: Check vulnerable packages
+      run: |
+        # Ищем основной проект
+        PROJECT_FILE=$(find src -name "*.csproj" | head -1)
+        if [ -z "$PROJECT_FILE" ]; then
+          echo "Error: No .csproj file found in src directory!"
+          exit 1
+        fi
+        echo "Checking vulnerabilities in $PROJECT_FILE"
+        dotnet list "$PROJECT_FILE" package --vulnerable
     
     - name: List build artifacts
       run: ls -la src/bin/Release/net8.0/
@@ -47,24 +63,22 @@ jobs:
     - name: VirusTotal scan
       run: |
         echo "Starting VirusTotal scan..."
-        FILE_PATH="src/bin/Release/net8.0/Project.dll"  
-        
-        if [ ! -f "$FILE_PATH" ]; then
-          echo "Error: File $FILE_PATH not found!"
+        # Автоматически определяем первый .dll файл
+        DLL_FILE=$(find src/bin/Release/net8.0 -name "*.dll" | head -1)
+        if [ -z "$DLL_FILE" ]; then
+          echo "Error: No .dll files found in src/bin/Release/net8.0/"
+          ls -la src/bin/Release/net8.0/
           exit 1
         fi
         
-        echo "Scanning $FILE_PATH with VirusTotal..."
+        echo "Scanning $DLL_FILE with VirusTotal..."
         SCAN_RESULT=$(curl -s -X POST \
           -H "x-apikey: ${{ secrets.VIRUSTOTAL_API_KEY }}" \
-          -F "file=@$FILE_PATH" \
+          -F "file=@$DLL_FILE" \
           https://www.virustotal.com/api/v3/files)
         
         echo "Scan results:"
-        echo $SCAN_RESULT | jq .
-        
-    - name: Check vulnerable packages
-      run: dotnet list package --vulnerable
+        echo "$SCAN_RESULT" | jq .
 
   build:
     needs: security
