@@ -103,11 +103,17 @@ jobs:
         
         - name: Update changelog
           run: |
-            echo "## [v$(cat version)] - $(date +'%Y-%m-%d')" > temp-changelog.md
-            echo "- Build ${GITHUB_RUN_NUMBER}" >> temp-changelog.md
-            echo "- Updated dependencies" >> temp-changelog.md
-            cat changelog.md >> temp-changelog.md
-            mv temp-changelog.md changelog.md
+            TEMP_CHANGELOG="changelog_$(date +%s).tmp"
+            
+            echo "## [v$(cat version)] - $(date +'%Y-%m-%d')" > $TEMP_CHANGELOG
+            echo "- Build $GITHUB_RUN_NUMBER" >> $TEMP_CHANGELOG
+            echo "- Merged from $GITHUB_HEAD_REF" >> $TEMP_CHANGELOG
+            
+            if [ -f changelog.md ]; then
+              cat changelog.md >> $TEMP_CHANGELOG
+            fi
+            
+            mv $TEMP_CHANGELOG changelog.md
         
         - name: Commit and push changes
           env:
@@ -147,13 +153,29 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Send Telegram notification
+    - name: Update changelog
+      run: |
+        TEMP_FILE="changelog_$(date +%s).tmp"
+        echo "[v$(cat version)] $(date +'%Y-%m-%d')" > $TEMP_FILE
+        echo "- Build $GITHUB_RUN_NUMBER" >> $TEMP_FILE
+        [ -f changelog.md ] && cat changelog.md >> $TEMP_FILE
+        mv $TEMP_FILE changelog.md
+    
+    - name: Create txt version
+      run: |
+        cp changelog.md changelog.txt
+        
+        if command -v pandoc &> /dev/null; then
+          pandoc changelog.md -t plain -o changelog.txt
+        fi
+    
+    - name: Send notification
+      if: github.event_name == 'push'
       uses: appleboy/telegram-action@master
       with:
         to: ${{ secrets.TELEGRAM_CHAT_ID }}
         token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         message: |
-          ✅ C# Script v$(cat version) passed all checks!
-          📝 Changelog:
-          $(head -5 changelog.md)
-        file: changelog.md
+          🚀 Сборка ${{ github.run_number }} успешна!
+          📋 Изменения во вложении
+        file: changelog.txt
