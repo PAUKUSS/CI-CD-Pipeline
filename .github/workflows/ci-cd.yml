@@ -44,7 +44,7 @@ jobs:
     - name: VirusTotal scan
       run: |
         echo "Starting VirusTotal scan..."
-        FILE_PATH="src/bin/Release/net8.0/Program.dll"  
+        FILE_PATH="src/bin/Release/net8.0/Project.dll"  
         
         if [ ! -f "$FILE_PATH" ]; then
           echo "Error: File $FILE_PATH not found!"
