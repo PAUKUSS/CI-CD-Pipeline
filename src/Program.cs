@@ -7,3 +7,4 @@ public class Program
         Console.WriteLine("Result: " + Add(2, 3));
     }
 }
+//idk
