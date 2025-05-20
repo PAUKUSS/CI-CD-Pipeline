@@ -111,30 +111,31 @@ jobs:
         
         - name: Commit and push changes
           env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           run: |
+            # Настраиваем Git
             git config --global user.name "GitHub Actions"
             git config --global user.email "actions@github.com"
+            git config --global pull.rebase true
+        
+            CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+            echo "Working on branch: $CURRENT_BRANCH"
+        
+            git add changelog.md version
             
-            git add -A
-            
-            if git diff-index --quiet HEAD --; then
-              echo "No changes to commit"
+            if ! git diff-index --quiet HEAD --; then
+              git commit -m "CI: Update changelog for v$(cat version) [skip ci]"
+              
+              git fetch origin $CURRENT_BRANCH
+              
+              git rebase origin/$CURRENT_BRANCH
+              
+              git push "https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git" HEAD:$CURRENT_BRANCH --force-with-lease
+              
+              echo "Changes pushed successfully"
             else
-              git commit -m "CI: Update changelog for v$(cat version) [skip ci]"
+              echo "No changes to commit"
             fi
-            
-            git fetch origin main
-            git reset --hard origin/main
-            
-            if [ -f changelog.md ]; then
-              git checkout origin/main -- changelog.md 2>/dev/null || true
-              cat temp-changelog.md > changelog.md
-              git add changelog.md
-              git commit -m "CI: Update changelog for v$(cat version) [skip ci]"
-            fi
-            
-            git push "https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git" HEAD:main
 
   notify:
     needs: build
