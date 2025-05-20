@@ -1,15 +1,10 @@
-name: CI/CD Pipeline
+name: CI/CD for C# Script
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+on: [push, pull_request]
 
 jobs:
-  build-and-test:
-    runs-on: windows-latest
-    
+  test:
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     
@@ -18,36 +13,69 @@ jobs:
       with:
         dotnet-version: '8.0.x'
     
-    - name: Build
-      run: dotnet build --configuration Release
+    - name: Run tests
+      run: |
+        cd tests
+        dotnet test --logger "trx;LogFileName=test-results.trx"
     
-    - name: Test
-      run: dotnet test --no-build --configuration Release
-    
-    - name: Publish
-      run: dotnet publish -c Release -o ./publish
-    
-    - name: Upload artifact
+    - name: Upload test results
       uses: actions/upload-artifact@v3
       with:
-        name: app
-        path: ./publish
+        name: test-results
+        path: tests/TestResults/*.trx
 
-  docker-build:
-    needs: build-and-test
+  security:
+    needs: test
     runs-on: ubuntu-latest
-    
     steps:
     - uses: actions/checkout@v4
     
-    - name: Login to Docker Hub
-      uses: docker/login-action@v2
+    - name: VirusTotal scan
+      uses: actions/virustotal-scan@v1
       with:
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_TOKEN }}
+        api_key: ${{ secrets.VIRUSTOTAL_API_KEY }}
+        path: src/bin/Release/net8.0/
     
-    - name: Build and push
-      uses: docker/build-push-action@v4
+    - name: Dependency check
+      run: dotnet list package --vulnerable
+
+  build:
+    needs: security
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Build
+      run: dotnet build src --configuration Release
+    
+    - name: Update changelog
+      run: |
+        echo "## [v$(cat version)] - $(date +'%Y-%m-%d')" > temp-changelog.md
+        echo "- Initial release" >> temp-changelog.md
+        cat changelog.md >> temp-changelog.md
+        mv temp-changelog.md changelog.md
+    
+    - name: Commit changes
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add changelog.md
+        git commit -m "CI: Update changelog for v$(cat version)"
+        git push
+
+  notify:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Send Telegram notification
+      uses: appleboy/telegram-action@master
       with:
-        push: true
-        tags: ${{ secrets.DOCKER_HUB_USERNAME }}/mediaplayer:latest
+        to: ${{ secrets.TELEGRAM_CHAT_ID }}
+        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        message: |
+          ✅ C# Script v$(cat version) passed all checks!
+          📝 Changelog:
+          $(head -5 changelog.md)
+        file: changelog.md
