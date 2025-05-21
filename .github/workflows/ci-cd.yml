@@ -167,7 +167,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: true  # Критически важно для push
+          persist-credentials: true
   
       - name: Setup timezone
         run: |
@@ -188,7 +188,6 @@ jobs:
           mv version.tmp version
           echo "New version: $(cat version)"
           
-          # Фикс push изменений версии
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add version
@@ -202,9 +201,9 @@ jobs:
           echo "build_number=$GITHUB_RUN_NUMBER" >> $GITHUB_OUTPUT
           echo "run_url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> $GITHUB_OUTPUT
   
-      - name: Prepare changelog.txt
+      - name: Prepare changelog files
         run: |
-          # Ваш оригинальный код без изменений
+          # Сохраняем оригинальный формат changelog.txt
           echo "╔══════════════════════════════╗" > changelog.txt
           echo "║        BUILD SUMMARY         ║" >> changelog.txt
           echo "╠══════════════════════════════╣" >> changelog.txt
@@ -221,11 +220,14 @@ jobs:
             grep -v '^##' changelog.md | head -n 5 | sed 's/^-/•/' >> changelog.txt
           fi
   
-          echo "Changelog content preview:"
-          cat changelog.txt
+          # Создаем changelog.md для отправки в Telegram (если не существует)
+          if [ ! -f changelog.md ]; then
+            cp changelog.txt changelog.md
+          fi
   
-          # Добавляем только проверку прав файла
-          chmod 644 changelog.txt
+          chmod 644 changelog.txt changelog.md
+          echo "Changelog files prepared:"
+          ls -la changelog.*
   
       - name: Trim changelog.md
         run: |
@@ -241,7 +243,7 @@ jobs:
             git push origin HEAD:${{ github.ref_name }} || echo "Push failed or nothing to push"
           fi
   
-      - name: Validate files before sending
+      - name: Validate files
         run: |
           echo "=== Current directory ==="
           pwd
@@ -250,55 +252,37 @@ jobs:
           echo "=== version file ==="
           cat version
           
-          echo "=== changelog.txt ==="
-          if [ ! -f changelog.txt ]; then
-            echo "::error::changelog.txt not found!"
-            exit 1
-          fi
-          ls -la changelog.txt
-          echo "File size: $(wc -c < changelog.txt) bytes"
-          
-          if [ ! -s changelog.txt ]; then
-            echo "::error::changelog.txt is empty!"
-            exit 1
-          fi
-  
-      - name: Create Telegram message
-        id: telegram_msg
-        run: |
-          # Ваш оригинальный формат сообщения
-          MSG=$(cat <<EOF
-          🚀 Сборка #${{ steps.version.outputs.build_number }} успешна!
-  
-          🏷 Версия: ${{ steps.version.outputs.version }}
-          📅 Дата: $(date +'%Y-%m-%d %H:%M MSK')
-          🔗 Подробности: ${{ steps.version.outputs.run_url }}
-  
-          Изменения во вложенном файле ↓
-          EOF
-          )
-          echo "message<<EOF" >> $GITHUB_OUTPUT
-          echo "$MSG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "=== changelog files ==="
+          ls -la changelog.*
+          [ -s changelog.txt ] || echo "::error::changelog.txt is empty!"
+          [ -s changelog.md ] || echo "::warning::changelog.md is empty!"
   
       - name: Send Telegram notification
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          message: ${{ steps.telegram_msg.outputs.message }}
-          file: ${{ github.workspace }}/changelog.txt  # Абсолютный путь
-        env:
-          TZ: Europe/Moscow
-  
-      - name: Verify files were committed
-        if: always()
         run: |
-          echo "=== Git status ==="
+          # Формируем сообщение с Markdown-разметкой
+          TEXT="🚀 *Сборка #${{ steps.version.outputs.build_number }} успешна\!*\n\n"
+          TEXT+="🏷 *Версия:* \`${{ steps.version.outputs.version }}\`\n"
+          TEXT+="📅 *Дата:* $(date +'%Y-%m-%d %H:%M MSK')\n"
+          TEXT+="🔗 *Подробности:* [${{ github.repository }}](${{ steps.version.outputs.run_url }})\n\n"
+          TEXT+="_Изменения во вложенном файле_ ↓"
+  
+          # Отправка сообщения
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.CHAT_ID }}" \
+            -d parse_mode="MarkdownV2" \
+            -d text="$TEXT"
+  
+          # Отправка файла changelog.md
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendDocument" \
+            -F chat_id="${{ secrets.CHAT_ID }}" \
+            -F document=@"changelog.md" \
+            -F caption="Полный список изменений"
+  
+      - name: Verify results
+        run: |
+          echo "=== Final checks ==="
+          echo "Version: $(cat version)"
+          echo "Git status:"
           git status
-          echo "=== Version file content ==="
-          cat version
-          echo "=== Latest commit ==="
-          git log -1
-          echo "=== changelog.txt content ==="
-          cat changelog.txt || echo "changelog.txt not found"
+          echo "Telegram files sent:"
+          ls -la changelog.*
