@@ -265,24 +265,34 @@ jobs:
   
       - name: Send Telegram notification
         run: |
-          # Формируем сообщение с Markdown-разметкой
-          TEXT="🚀 *Сборка #${{ steps.version.outputs.build_number }} успешна\!*\n\n"
-          TEXT+="🏷 *Версия:* \`${{ steps.version.outputs.version }}\`\n"
-          TEXT+="📅 *Дата:* $(date +'%Y-%m-%d %H:%M MSK')\n"
-          TEXT+="🔗 *Подробности:* [${{ github.repository }}](${{ steps.version.outputs.run_url }})\n\n"
-          TEXT+="_Изменения во вложенном файле_ ↓"
-      
-          # Отправляем текстовое сообщение
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+          # Формируем текст сообщения (аналогично вашему рабочему скрипту)
+          TEXT="✅ *Сборка успешна*\n\n"
+          TEXT+="📦 Версия: \`$(cat version)\`\n"
+          TEXT+="🔗 [Подробности](${{ steps.version.outputs.run_url }})"
+          
+          # Отправляем сообщение через API Telegram
+          MESSAGE_RESPONSE=$(curl -s -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.CHAT_ID }}" \
-            -d parse_mode="MarkdownV2" \
-            -d text="$TEXT"
-      
+            -d parse_mode="Markdown" \
+            -d text="$TEXT")
+          
+          echo "Message response: $MESSAGE_RESPONSE"
+          
           # Отправляем файл changelog.txt
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendDocument" \
+          FILE_RESPONSE=$(curl -s -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendDocument" \
             -F chat_id="${{ secrets.CHAT_ID }}" \
-            -F document=@"${{ github.workspace }}/changelog.txt" \
-            -F caption="Changelog"
+            -F document=@"${{ github.workspace }}/changelog.txt")
+          
+          echo "File response: $FILE_RESPONSE"
+          
+          # Проверяем ответы API
+          if [[ $(echo "$MESSAGE_RESPONSE" | jq -r '.ok') != 'true' ]] || \
+             [[ $(echo "$FILE_RESPONSE" | jq -r '.ok') != 'true' ]]; then
+             echo "::error::Failed to send Telegram notification"
+             exit 1
+          fi
   
       - name: Verify files were committed
         if: always()
