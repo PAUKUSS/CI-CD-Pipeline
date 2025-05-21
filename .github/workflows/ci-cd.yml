@@ -161,42 +161,82 @@ jobs:
         fi
 
   notify:
-        needs: build
-        runs-on: ubuntu-latest
-        steps:
-        - uses: actions/checkout@v4
-        
-        - name: Get current version
-          id: version
-          run: echo "version=$(cat version)" >> $GITHUB_OUTPUT
-        
-        - name: Prepare notification data
-          id: prepare
-          run: |
-            echo "Version: $(cat version)" > changelog.txt
-            echo "Build: $GITHUB_RUN_NUMBER" >> changelog.txt
-            echo "Date: $(date +'%Y-%m-%d %H:%M:%S %Z')" >> changelog.txt
-            echo "" >> changelog.txt
-            echo "Changes:" >> changelog.txt
-            [ -f changelog.md ] && tail -n +3 changelog.md >> changelog.txt
-            
-            echo "Changelog.txt content:"
-            cat changelog.txt
-            echo "File exists: $(ls -la changelog.txt)"
-            
-            MESSAGE="🚀 Сборка $GITHUB_RUN_NUMBER успешна!
-            🏷 Версия: $(cat version)
-            📅 Дата: $(date +'%Y-%m-%d %H:%M %Z')
-            🔗 Подробности: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-            
-            echo "message=$MESSAGE" >> $GITHUB_OUTPUT
-        
-        - name: Send Telegram notification
-          uses: appleboy/telegram-action@master
-          with:
-            to: ${{ secrets.TELEGRAM_CHAT_ID }}
-            token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-            message: ${{ steps.prepare.outputs.message }}
-            file: changelog.txt
-          env:
-            TZ: Europe/Moscow 
+      needs: build
+      runs-on: ubuntu-latest
+      steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Полная история для changelog
+  
+      - name: Setup timezone
+        run: |
+          sudo timedatectl set-timezone Europe/Moscow
+          echo "Current time: $(date)"
+  
+      - name: Get version info
+        id: version
+        run: |
+          echo "version=$(cat version)" >> $GITHUB_OUTPUT
+          echo "build_number=$GITHUB_RUN_NUMBER" >> $GITHUB_OUTPUT
+          echo "run_url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> $GITHUB_OUTPUT
+  
+      - name: Prepare changelog.txt
+        run: |
+          # Формируем чистый changelog.txt
+          echo "╔══════════════════════════════╗" > changelog.txt
+          echo "║        BUILD SUMMARY         ║" >> changelog.txt
+          echo "╠══════════════════════════════╣" >> changelog.txt
+          echo "║ Version: $(cat version)      ║" >> changelog.txt
+          echo "║ Build: #$GITHUB_RUN_NUMBER   ║" >> changelog.txt
+          echo "║ Date: $(date +'%Y-%m-%d %H:%M %Z') ║" >> changelog.txt
+          echo "╚══════════════════════════════╝" >> changelog.txt
+          echo "" >> changelog.txt
+          
+          # Добавляем последние изменения (не более 5 пунктов)
+          if [ -f changelog.md ]; then
+            echo "▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄" >> changelog.txt
+            echo "█ RECENT CHANGES:" >> changelog.txt
+            echo "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀" >> changelog.txt
+            grep -v '^##' changelog.md | head -n 5 | sed 's/^-/•/' >> changelog.txt
+          fi
+  
+          echo "Changelog content preview:"
+          cat changelog.txt
+  
+      - name: Trim changelog.md
+        run: |
+          # Оставляем не более 20 последних записей
+          if [ -f changelog.md ]; then
+            echo "Trimming changelog.md..."
+            head -n 20 changelog.md > changelog.tmp
+            mv changelog.tmp changelog.md
+          fi
+
+      - name: Create Telegram message
+        id: telegram_msg
+        run: |
+          # Формируем сообщение с форматированием
+          MSG=$(cat <<EOF
+          <b>🚀 Сборка #${{ steps.version.outputs.build_number }} успешна!</b>
+  
+          <b>🏷 Версия:</b> <code>${{ steps.version.outputs.version }}</code>
+          <b>📅 Дата:</b> <pre>$(date +'%Y-%m-%d %H:%M %Z')</pre>
+          <b>🔗 Подробности:</b> <a href="${{ steps.version.outputs.run_url }}">View Run</a>
+  
+          <i>Изменения во вложенном файле ↓</i>
+          EOF
+          )
+          echo "message<<EOF" >> $GITHUB_OUTPUT
+          echo "$MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+  
+      - name: Send Telegram notification
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: ${{ steps.telegram_msg.outputs.message }}
+          file: changelog.txt
+          parse_mode: HTML
+        env:
+          TZ: Europe/Moscow
