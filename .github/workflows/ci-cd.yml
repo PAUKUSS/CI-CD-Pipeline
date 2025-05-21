@@ -161,89 +161,129 @@ jobs:
         fi
 
   notify:
-      needs: build
-      runs-on: ubuntu-latest
-      steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Полная история для changelog
-    
-      - name: Setup timezone
-        run: |
-          sudo timedatectl set-timezone Europe/Moscow
-          echo "Current time: $(date)"
-    
-      - name: Get version info
-        id: version
-        run: |
-          echo "version=$(cat version)" >> $GITHUB_OUTPUT
-          echo "build_number=$GITHUB_RUN_NUMBER" >> $GITHUB_OUTPUT
-          echo "run_url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> $GITHUB_OUTPUT
-    
-      - name: Prepare changelog.txt
-        run: |
-          # Формируем чистый changelog.txt
-          echo "╔══════════════════════════════╗" > changelog.txt
-          echo "║        BUILD SUMMARY         ║" >> changelog.txt
-          echo "╠══════════════════════════════╣" >> changelog.txt
-          echo "║ Version: $(cat version)      ║" >> changelog.txt
-          echo "║ Build: #$GITHUB_RUN_NUMBER   ║" >> changelog.txt
-          echo "║ Date: $(date +'%Y-%m-%d %H:%M %Z') ║" >> changelog.txt
-          echo "╚══════════════════════════════╝" >> changelog.txt
-          echo "" >> changelog.txt
-          
-          # Добавляем последние изменения (не более 5 пунктов)
-          if [ -f changelog.md ]; then
-            echo "▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄" >> changelog.txt
-            echo "█ RECENT CHANGES:" >> changelog.txt
-            echo "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀" >> changelog.txt
-            grep -v '^##' changelog.md | head -n 5 | sed 's/^-/•/' >> changelog.txt
-          fi
-    
-          echo "Changelog content preview:"
-          cat changelog.txt
-    
-      - name: Trim changelog.md
-        run: |
-          # Оставляем не более 20 последних записей
-          if [ -f changelog.md ]; then
-            echo "Trimming changelog.md..."
-            head -n 20 changelog.md > changelog.tmp
-            mv changelog.tmp changelog.md
-          fi
-    
-      - name: Verify changelog.txt exists
-        run: |
-          echo "Working directory: $PWD"
-          ls -la
-          echo "File content:"
-          cat changelog.txt || echo "changelog.txt not found"
-    
-      - name: Create Telegram message
-        id: telegram_msg
-        run: |
-          # Формируем сообщение с форматированием
-          MSG=$(cat <<EOF
-          🚀 Сборка #${{ steps.version.outputs.build_number }} успешна!
-    
-          🏷 Версия: ${{ steps.version.outputs.version }}
-          📅 Дата: $(date +'%Y-%m-%d %H:%M %Z')
-          🔗 Подробности: "${{ steps.version.outputs.run_url }}"
-    
-          Изменения во вложенном файле ↓
-          EOF
-          )
-          echo "message<<EOF" >> $GITHUB_OUTPUT
-          echo "$MSG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-    
-      - name: Send Telegram notification
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          message: ${{ steps.telegram_msg.outputs.message }}
-          file: changelog.txt
-          parse_mode: HTML
-        env:
-          TZ: Europe/Moscow
+          needs: build
+          runs-on: ubuntu-latest
+          steps:
+          - uses: actions/checkout@v4
+            with:
+              fetch-depth: 0  # Полная история для changelog
+        
+          - name: Setup timezone
+            run: |
+              sudo timedatectl set-timezone Europe/Moscow
+              echo "Current time: $(date)"
+        
+          - name: Verify version file
+            run: |
+              if [ ! -f version ]; then
+                echo "1.0.0" > version
+                echo "Created version file with default value"
+              fi
+              echo "Current version: $(cat version)"
+        
+          - name: Increment version
+            run: |
+              awk -F. '{ OFS="."; $3++; print }' version > version.tmp
+              mv version.tmp version
+              echo "New version: $(cat version)"
+        
+          - name: Get version info
+            id: version
+            run: |
+              echo "version=$(cat version)" >> $GITHUB_OUTPUT
+              echo "build_number=$GITHUB_RUN_NUMBER" >> $GITHUB_OUTPUT
+              echo "run_url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> $GITHUB_OUTPUT
+        
+          - name: Prepare changelog.txt
+            run: |
+              # Формируем чистый changelog.txt
+              echo "╔══════════════════════════════╗" > changelog.txt
+              echo "║        BUILD SUMMARY         ║" >> changelog.txt
+              echo "╠══════════════════════════════╣" >> changelog.txt
+              echo "║ Version: $(cat version)      ║" >> changelog.txt
+              echo "║ Build: #$GITHUB_RUN_NUMBER   ║" >> changelog.txt
+              echo "║ Date: $(date +'%Y-%m-%d %H:%M %Z') ║" >> changelog.txt
+              echo "╚══════════════════════════════╝" >> changelog.txt
+              echo "" >> changelog.txt
+              
+              # Добавляем последние изменения (не более 5 пунктов)
+              if [ -f changelog.md ]; then
+                echo "▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄" >> changelog.txt
+                echo "█ RECENT CHANGES:" >> changelog.txt
+                echo "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀" >> changelog.txt
+                grep -v '^##' changelog.md | head -n 5 | sed 's/^-/•/' >> changelog.txt
+              fi
+        
+              echo "Changelog content preview:"
+              cat changelog.txt
+        
+          - name: Trim changelog.md
+            run: |
+              # Оставляем не более 20 последних записей
+              if [ -f changelog.md ]; then
+                echo "Trimming changelog.md..."
+                head -n 20 changelog.md > changelog.tmp
+                mv changelog.tmp changelog.md
+              fi
+        
+          - name: Validate files before sending
+            run: |
+              echo "=== Current directory ==="
+              pwd
+              ls -la
+              
+              echo "=== version file ==="
+              cat version
+              
+              echo "=== changelog.txt ==="
+              if [ ! -f changelog.txt ]; then
+                echo "::error::changelog.txt not found!"
+                exit 1
+              fi
+              ls -la changelog.txt
+              echo "File size: $(wc -c < changelog.txt) bytes"
+              
+              # Проверка что файл не пустой
+              if [ ! -s changelog.txt ]; then
+                echo "::error::changelog.txt is empty!"
+                exit 1
+              fi
+        
+          - name: Create Telegram message
+            id: telegram_msg
+            run: |
+              # Формируем сообщение с форматированием
+                  MSG=$(cat <<EOF
+                  🚀 Сборка #${{ steps.version.outputs.build_number }} успешна!
+            
+                  🏷 Версия: ${{ steps.version.outputs.version }}
+                  📅 Дата: $(date +'%Y-%m-%d %H:%M %Z')
+                  🔗 Подробности: "${{ steps.version.outputs.run_url }}"
+            
+                  Изменения во вложенном файле ↓
+                  EOF
+              )
+              echo "message<<EOF" >> $GITHUB_OUTPUT
+              echo "$MSG" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+        
+          - name: Send Telegram notification
+            uses: appleboy/telegram-action@master
+            with:
+              to: ${{ secrets.TELEGRAM_CHAT_ID }}
+              token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+              message: ${{ steps.telegram_msg.outputs.message }}
+              file: ${{ github.workspace }}/changelog.txt
+              parse_mode: HTML
+            env:
+              TZ: Europe/Moscow
+        
+          - name: Verify files were committed
+            if: always()
+            run: |
+              echo "=== Git status ==="
+              git status
+              echo "=== Version file content ==="
+              cat version
+              echo "=== Latest commit ==="
+              git log -1
