@@ -274,9 +274,11 @@ jobs:
           cat ${{ github.workspace }}/changelog.txt || echo "No changelog.txt found"
       
           # Формируем текст сообщения (аналогично вашему рабочему скрипту)
-          TEXT="✅ *Сборка успешна*\n\n"
-          TEXT+="📦 Версия: \`$(cat version)\`\n"
-          TEXT+="🔗 [Подробности](${{ steps.version.outputs.run_url }})"
+            TEXT="🚀 *Сборка #${{ steps.version.outputs.build_number }} успешна\!*\n\n"
+            TEXT+="🏷 *Версия:* \`${{ steps.version.outputs.version }}\`\n"
+            TEXT+="📅 *Дата:* $(date +'%Y-%m-%d %H:%M MSK')\n"
+            TEXT+="🔗 *Подробности:* [${{ github.repository }}](${{ steps.version.outputs.run_url }})\n\n"
+            TEXT+="_Изменения во вложенном файле_ ↓"
           
           echo "Sending message to Telegram..."
           echo "Message text:"
