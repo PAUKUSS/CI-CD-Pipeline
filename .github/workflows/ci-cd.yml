@@ -167,19 +167,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Полная история для changelog
-  
+    
       - name: Setup timezone
         run: |
           sudo timedatectl set-timezone Europe/Moscow
           echo "Current time: $(date)"
-  
+    
       - name: Get version info
         id: version
         run: |
           echo "version=$(cat version)" >> $GITHUB_OUTPUT
           echo "build_number=$GITHUB_RUN_NUMBER" >> $GITHUB_OUTPUT
           echo "run_url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> $GITHUB_OUTPUT
-  
+    
       - name: Prepare changelog.txt
         run: |
           # Формируем чистый changelog.txt
@@ -199,10 +199,10 @@ jobs:
             echo "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀" >> changelog.txt
             grep -v '^##' changelog.md | head -n 5 | sed 's/^-/•/' >> changelog.txt
           fi
-  
+    
           echo "Changelog content preview:"
           cat changelog.txt
-  
+    
       - name: Trim changelog.md
         run: |
           # Оставляем не более 20 последних записей
@@ -211,25 +211,32 @@ jobs:
             head -n 20 changelog.md > changelog.tmp
             mv changelog.tmp changelog.md
           fi
-
+    
+      - name: Verify changelog.txt exists
+        run: |
+          echo "Working directory: $PWD"
+          ls -la
+          echo "File content:"
+          cat changelog.txt || echo "changelog.txt not found"
+    
       - name: Create Telegram message
         id: telegram_msg
         run: |
           # Формируем сообщение с форматированием
           MSG=$(cat <<EOF
           <b>🚀 Сборка #${{ steps.version.outputs.build_number }} успешна!</b>
-  
-          <b>🏷 Версия:</b> <code>${{ steps.version.outputs.version }}</code>
-          <b>📅 Дата:</b> <pre>$(date +'%Y-%m-%d %H:%M %Z')</pre>
-          <b>🔗 Подробности:</b> <a href="${{ steps.version.outputs.run_url }}">View Run</a>
-  
-          <i>Изменения во вложенном файле ↓</i>
+    
+          🏷 Версия: <code>${{ steps.version.outputs.version }}</code>
+          📅 Дата: $(date +'%Y-%m-%d %H:%M %Z')
+          🔗 Подробности: <a href="${{ steps.version.outputs.run_url }}">View Run</a>
+    
+          Изменения во вложенном файле ↓
           EOF
           )
           echo "message<<EOF" >> $GITHUB_OUTPUT
           echo "$MSG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-  
+    
       - name: Send Telegram notification
         uses: appleboy/telegram-action@master
         with:
