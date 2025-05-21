@@ -167,7 +167,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: true  # Критически важно для push
   
       - name: Setup timezone
         run: |
@@ -188,6 +188,7 @@ jobs:
           mv version.tmp version
           echo "New version: $(cat version)"
           
+          # Фикс push изменений версии
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add version
@@ -201,9 +202,9 @@ jobs:
           echo "build_number=$GITHUB_RUN_NUMBER" >> $GITHUB_OUTPUT
           echo "run_url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> $GITHUB_OUTPUT
   
-      - name: Prepare changelog files
+      - name: Prepare changelog.txt
         run: |
-          # Сохраняем оригинальный формат changelog.txt
+          # Ваш оригинальный код без изменений
           echo "╔══════════════════════════════╗" > changelog.txt
           echo "║        BUILD SUMMARY         ║" >> changelog.txt
           echo "╠══════════════════════════════╣" >> changelog.txt
@@ -220,14 +221,11 @@ jobs:
             grep -v '^##' changelog.md | head -n 5 | sed 's/^-/•/' >> changelog.txt
           fi
   
-          # Создаем changelog.md для отправки в Telegram (если не существует)
-          if [ ! -f changelog.md ]; then
-            cp changelog.txt changelog.md
-          fi
+          echo "Changelog content preview:"
+          cat changelog.txt
   
-          chmod 644 changelog.txt changelog.md
-          echo "Changelog files prepared:"
-          ls -la changelog.*
+          # Добавляем только проверку прав файла
+          chmod 644 changelog.txt
   
       - name: Trim changelog.md
         run: |
@@ -243,7 +241,7 @@ jobs:
             git push origin HEAD:${{ github.ref_name }} || echo "Push failed or nothing to push"
           fi
   
-      - name: Validate files
+      - name: Validate files before sending
         run: |
           echo "=== Current directory ==="
           pwd
@@ -252,10 +250,18 @@ jobs:
           echo "=== version file ==="
           cat version
           
-          echo "=== changelog files ==="
-          ls -la changelog.*
-          [ -s changelog.txt ] || echo "::error::changelog.txt is empty!"
-          [ -s changelog.md ] || echo "::warning::changelog.md is empty!"
+          echo "=== changelog.txt ==="
+          if [ ! -f changelog.txt ]; then
+            echo "::error::changelog.txt not found!"
+            exit 1
+          fi
+          ls -la changelog.txt
+          echo "File size: $(wc -c < changelog.txt) bytes"
+          
+          if [ ! -s changelog.txt ]; then
+            echo "::error::changelog.txt is empty!"
+            exit 1
+          fi
   
       - name: Send Telegram notification
         run: |
@@ -265,24 +271,27 @@ jobs:
           TEXT+="📅 *Дата:* $(date +'%Y-%m-%d %H:%M MSK')\n"
           TEXT+="🔗 *Подробности:* [${{ github.repository }}](${{ steps.version.outputs.run_url }})\n\n"
           TEXT+="_Изменения во вложенном файле_ ↓"
-  
-          # Отправка сообщения
+      
+          # Отправляем текстовое сообщение
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.CHAT_ID }}" \
             -d parse_mode="MarkdownV2" \
             -d text="$TEXT"
-  
-          # Отправка файла changelog.md
+      
+          # Отправляем файл changelog.txt
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendDocument" \
             -F chat_id="${{ secrets.CHAT_ID }}" \
-            -F document=@"changelog.md" \
-            -F caption="Полный список изменений"
+            -F document=@"${{ github.workspace }}/changelog.txt" \
+            -F caption="Changelog"
   
-      - name: Verify results
+      - name: Verify files were committed
+        if: always()
         run: |
-          echo "=== Final checks ==="
-          echo "Version: $(cat version)"
-          echo "Git status:"
+          echo "=== Git status ==="
           git status
-          echo "Telegram files sent:"
-          ls -la changelog.*
+          echo "=== Version file content ==="
+          cat version
+          echo "=== Latest commit ==="
+          git log -1
+          echo "=== changelog.txt content ==="
+          cat changelog.txt || echo "changelog.txt not found"
