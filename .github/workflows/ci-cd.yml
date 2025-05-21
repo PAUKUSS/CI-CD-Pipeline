@@ -224,11 +224,11 @@ jobs:
         run: |
           # Формируем сообщение с форматированием
           MSG=$(cat <<EOF
-          <b>🚀 Сборка #${{ steps.version.outputs.build_number }} успешна!</b>
+          🚀 Сборка #${{ steps.version.outputs.build_number }} успешна!
     
-          🏷 Версия: <code>${{ steps.version.outputs.version }}</code>
+          🏷 Версия: ${{ steps.version.outputs.version }}
           📅 Дата: $(date +'%Y-%m-%d %H:%M %Z')
-          🔗 Подробности: <a href="${{ steps.version.outputs.run_url }}">View Run</a>
+          🔗 Подробности: "${{ steps.version.outputs.run_url }}"
     
           Изменения во вложенном файле ↓
           EOF
