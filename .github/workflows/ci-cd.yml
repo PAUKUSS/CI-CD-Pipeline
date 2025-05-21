@@ -161,34 +161,42 @@ jobs:
         fi
 
   notify:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Verify files
-      run: |
-        echo "Current version: $(cat version)"
-        echo "Changelog.md content:"
-        cat changelog.md
-        echo ""
-        echo "Changelog.txt content:"
-        cat changelog.txt
-        echo ""
-        echo "File sizes:"
-        ls -la changelog.*
-    
-    - name: Send Telegram notification
-      if: github.event_name == 'push'
-      uses: appleboy/telegram-action@master
-      with:
-        to: ${{ secrets.TELEGRAM_CHAT_ID }}
-        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        message: |
-          🚀 Сборка ${{ github.run_number }} успешна!
-          🏷 Версия: $(cat version)
-          📅 Дата: $(date +'%Y-%m-%d %H:%M')
-          🔗 Подробности: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        file: changelog.txt
-      env:
-        TELEGRAM_DEBUG: true
+        needs: build
+        runs-on: ubuntu-latest
+        steps:
+        - uses: actions/checkout@v4
+        
+        - name: Get current version
+          id: version
+          run: echo "version=$(cat version)" >> $GITHUB_OUTPUT
+        
+        - name: Prepare notification data
+          id: prepare
+          run: |
+            echo "Version: $(cat version)" > changelog.txt
+            echo "Build: $GITHUB_RUN_NUMBER" >> changelog.txt
+            echo "Date: $(date +'%Y-%m-%d %H:%M:%S %Z')" >> changelog.txt
+            echo "" >> changelog.txt
+            echo "Changes:" >> changelog.txt
+            [ -f changelog.md ] && tail -n +3 changelog.md >> changelog.txt
+            
+            echo "Changelog.txt content:"
+            cat changelog.txt
+            echo "File exists: $(ls -la changelog.txt)"
+            
+            MESSAGE="🚀 Сборка $GITHUB_RUN_NUMBER успешна!
+            🏷 Версия: $(cat version)
+            📅 Дата: $(date +'%Y-%m-%d %H:%M %Z')
+            🔗 Подробности: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            
+            echo "message=$MESSAGE" >> $GITHUB_OUTPUT
+        
+        - name: Send Telegram notification
+          uses: appleboy/telegram-action@master
+          with:
+            to: ${{ secrets.TELEGRAM_CHAT_ID }}
+            token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+            message: ${{ steps.prepare.outputs.message }}
+            file: changelog.txt
+          env:
+            TZ: Europe/Moscow 
