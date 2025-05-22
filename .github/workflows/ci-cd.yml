@@ -340,31 +340,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
   
-      # 1. Проверка наличия необходимых файлов
-      - name: Verify prerequisites
+      # Шаг диагностики (временный)
+      - name: Debug Docker Hub credentials
         run: |
-          echo "Version: $(cat version)"
-          echo "Dockerfile content:"
-          cat Dockerfile || (echo "::error::Dockerfile not found!" && exit 1)
+          echo "Docker Hub username: paukuss"
+          echo "Token exists: ${{ secrets.DOCKERHUB_TOKEN != '' }}"
+          echo "Repository: CI-CD-Pipeline"
   
-      # 2. Логин в Docker Hub (исправленная версия)
+      # Исправленный логин
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: paukuss
           password: ${{ secrets.DOCKERHUB_TOKEN }}
   
-      # 3. Сборка и публикация образа
+      # Сборка и публикация
       - name: Build and push Docker image
         run: |
           VERSION=$(cat version)
-          docker build -t paukuss/CI-CD-Pipeline:v$VERSION .
-          docker push paukuss/CI-CD-Pipeline:v$VERSION
-  
-      # 4. Добавление метки (опционально)
-      - name: Add dockerhub label
-        if: github.event.pull_request != null
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          labels: docker-published
+          echo "Building version: v$VERSION"
+          docker build -t paukuss/ci-cd-pipeline:v$VERSION .
+          docker push paukuss/ci-cd-pipeline:v$VERSION
