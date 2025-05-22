@@ -340,27 +340,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      # Проверка секретов с совместимым синтаксисом
       - name: Verify Docker Hub secrets
         run: |
-          echo "Docker Hub Login: ${{ secrets.DOCKER_HUB_LOGIN }}"
-          echo "Docker Hub Token: ${{ secrets.DOCKERHUB_HUB_TOKEN != '' ? '***SET***' : 'NOT_SET' }}"
+          if [ -z "$DOCKER_HUB_USERNAME" ] || [ -z "$DOCKER_HUB_TOKEN" ]; then
+            echo "::error::Docker Hub credentials not set!"
+            exit 1
+          fi
+          echo "Docker Hub Login: $DOCKER_HUB_USERNAME"
+          echo "Docker Hub Token: ***"
+        env:
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_LOGIN }}
+          DOCKER_HUB_TOKEN: ${{ secrets.DOCKERHUB_HUB_TOKEN }}
       
+      # Логин в Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_HUB_LOGIN }}
           password: ${{ secrets.DOCKERHUB_HUB_TOKEN }}
       
+      # Настройка Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       
+      # Сборка и публикация
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKER_HUB_LOGIN }}/my-app:latest
-            ${{ secrets.DOCKER_HUB_LOGIN }}/my-app:${{ needs.build.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ${{ secrets.DOCKER_HUB_LOGIN }}/${{ github.repository }}:latest
+            ${{ secrets.DOCKER_HUB_LOGIN }}/${{ github.repository }}:${{ steps.get_version.outputs.version }}
+        env:
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_LOGIN }}
+          DOCKER_HUB_TOKEN: ${{ secrets.DOCKERHUB_HUB_TOKEN }}
