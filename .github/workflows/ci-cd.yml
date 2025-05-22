@@ -358,15 +358,8 @@ jobs:
       - name: Build and push Docker image
         run: |
           VERSION=$(cat version)
-          IMAGE_NAME="${{ vars.DOCKERHUB_USERNAME || 'your_default_username' }}/${GITHUB_REPOSITORY#*/}"
-          
-          echo "Building image: $IMAGE_NAME"
-          docker build -t $IMAGE_NAME:$VERSION -t $IMAGE_NAME:latest .
-          
-          echo "Pushing images..."
-          docker push $IMAGE_NAME:$VERSION
-          docker push $IMAGE_NAME:latest
-          echo "Successfully pushed images to Docker Hub"
+          docker build -t paukuss/CI-CD-Pipeline:v$VERSION .
+          docker push paukuss/CI-CD-Pipeline:v$VERSION
   
       # 4. Добавление метки (опционально)
       - name: Add dockerhub label
