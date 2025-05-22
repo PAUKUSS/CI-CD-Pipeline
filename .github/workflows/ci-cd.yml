@@ -335,44 +335,43 @@ jobs:
 
 #Этап пятый -  жокер хаб)
   docker_publish:
-        needs: build
-        runs-on: ubuntu-latest
-        steps:
-          - uses: actions/checkout@v4
-      
-          - name: Verify prerequisites
-            run: |
-              echo "Checking version file..."
-              cat version || exit 1
-              echo "Checking Dockerfile..."
-              ls -la Dockerfile || exit 1
-      
-          - name: Login to Docker Hub
-            uses: docker/login-action@v3
-            with:
-              username: ${{ vars.DOCKER_HUB_LOGIN || secrets.DOCKER_HUB_LOGIN }}
-              password: ${{ secrets.DOCKERHUB_TOKEN }}
-      
-          - name: Build and push Docker image
-            run: |
-              # Получаем версию
-              VERSION=$(cat version)
-              IMAGE_NAME="${{ vars.DOCKER_HUB_LOGIN || secrets.DOCKER_HUB_LOGIN }}/${{ github.repository }}"
-              
-              # Собираем и пушим образ
-              docker build -t $IMAGE_NAME:v$VERSION -t $IMAGE_NAME:latest .
-              
-              echo "Pushing versioned image (v$VERSION)..."
-              docker push $IMAGE_NAME:v$VERSION
-              
-              echo "Pushing latest image..."
-              docker push $IMAGE_NAME:latest
-              
-              echo "Successfully pushed both tags"
-      
-          - name: Add dockerhub label
-            if: github.event.pull_request != null
-            uses: actions-ecosystem/action-add-labels@v1
-            with:
-              github_token: ${{ secrets.GITHUB_TOKEN }}
-              labels: docker-published
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+  
+      # 1. Проверка наличия необходимых файлов
+      - name: Verify prerequisites
+        run: |
+          echo "Version: $(cat version)"
+          echo "Dockerfile content:"
+          cat Dockerfile || (echo "::error::Dockerfile not found!" && exit 1)
+  
+      # 2. Логин в Docker Hub (исправленная версия)
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME || 'your_default_username' }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+  
+      # 3. Сборка и публикация образа
+      - name: Build and push Docker image
+        run: |
+          VERSION=$(cat version)
+          IMAGE_NAME="${{ vars.DOCKERHUB_USERNAME || 'your_default_username' }}/${GITHUB_REPOSITORY#*/}"
+          
+          echo "Building image: $IMAGE_NAME"
+          docker build -t $IMAGE_NAME:$VERSION -t $IMAGE_NAME:latest .
+          
+          echo "Pushing images..."
+          docker push $IMAGE_NAME:$VERSION
+          docker push $IMAGE_NAME:latest
+          echo "Successfully pushed images to Docker Hub"
+  
+      # 4. Добавление метки (опционально)
+      - name: Add dockerhub label
+        if: github.event.pull_request != null
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          labels: docker-published
