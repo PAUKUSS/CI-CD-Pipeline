@@ -82,7 +82,7 @@ jobs:
         echo "$SCAN_RESULT" | jq .
         echo "VirusTotal scan completed for $DLL_FILE"
 
-#Этап третий - сборка
+#Этап третий -сборка
   build:
     needs: security
     runs-on: ubuntu-latest
