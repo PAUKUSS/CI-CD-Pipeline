@@ -3,6 +3,8 @@ name: CI/CD for C# Script
 on: [push, pull_request]
 
 jobs:
+
+#Первый этап - тест
   test:
     runs-on: ubuntu-latest
     steps:
@@ -24,6 +26,7 @@ jobs:
         name: test-results
         path: tests/TestResults/*.trx
 
+#Второй этап - проверка безопасности с помощью virustotal 
   security:
     needs: test
     runs-on: ubuntu-latest
@@ -79,6 +82,7 @@ jobs:
         echo "$SCAN_RESULT" | jq .
         echo "VirusTotal scan completed for $DLL_FILE"
 
+#Этап третий - сборка
   build:
     needs: security
     runs-on: ubuntu-latest
@@ -160,6 +164,7 @@ jobs:
           echo "No changes to commit"
         fi
 
+#Этап четвертый - сообщение в тг
   notify:
     needs: build
     runs-on: ubuntu-latest
@@ -167,7 +172,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: true  # Критически важно для push
+          persist-credentials: true  
   
       - name: Setup timezone
         run: |
@@ -224,7 +229,6 @@ jobs:
           echo "Changelog content preview:"
           cat changelog.txt
   
-          # Добавляем только проверку прав файла
           chmod 644 changelog.txt
   
       - name: Trim changelog.md
@@ -273,7 +277,6 @@ jobs:
           echo "Changelog content:"
           cat ${{ github.workspace }}/changelog.txt || echo "No changelog.txt found"
       
-          # Формируем текст сообщения (аналогично вашему рабочему скрипту)
             TEXT="🚀 *Сборка #${{ steps.version.outputs.build_number }} успешна\!*\n\n"
             TEXT+="🏷 *Версия:* \`${{ steps.version.outputs.version }}\`\n"
             TEXT+="📅 *Дата:* $(date +'%Y-%m-%d %H:%M MSK')\n"
@@ -284,7 +287,6 @@ jobs:
           echo "Message text:"
           echo "$TEXT"
       
-          # Отправляем сообщение через API Telegram
           MESSAGE_RESPONSE=$(curl -s -X POST \
             "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
@@ -294,7 +296,6 @@ jobs:
           echo "Telegram API response for message:"
           echo "$MESSAGE_RESPONSE"
           
-          # Отправляем файл changelog.txt
           echo "Sending changelog file..."
           FILE_RESPONSE=$(curl -s -X POST \
             "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
@@ -330,3 +331,31 @@ jobs:
           git log -1
           echo "=== changelog.txt content ==="
           cat changelog.txt || echo "changelog.txt not found"
+
+
+#Этап пятый -  жокер хаб)
+  docker_publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_LOGIN }}
+          password: ${{ secrets.DOCKERHUB_HUB_TOKEN }}
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_HUB_LOGIN }}/${{ github.repository }}:latest
+            ${{ secrets.DOCKER_HUB_LOGIN }}/${{ github.repository }}:${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
