@@ -133,7 +133,7 @@ jobs:
         else
           echo "Version remains $CURRENT_VERSION"
         fi
-
+    
     - name: Update changelog
       run: |
         echo "Creating temporary changelog file..."
@@ -155,18 +155,20 @@ jobs:
         echo "Changelog updated successfully"
         
         echo "Creating changelog.txt..."
-        echo "Version: $(cat version)" > changelog.txt
-        echo "Build: $GITHUB_RUN_NUMBER" >> changelog.txt
-        echo "Date: $(date +'%Y-%m-%d %H:%M:%S')" >> changelog.txt
-        echo "" >> changelog.txt
-        echo "Changes:" >> changelog.txt
-        [ -f changelog.md ] && tail -n +3 changelog.md >> changelog.txt
+        {
+          echo "Version: $(cat version)"
+          echo "Build: $GITHUB_RUN_NUMBER"
+          echo "Date: $(date +'%Y-%m-%d %H:%M:%S')"
+          echo ""
+          echo "Changes:"
+          [ -f changelog.md ] && tail -n +3 changelog.md
+        } > changelog.txt
         echo "Changelog.txt created successfully"
         
-        - name: Commit and push changes
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          run: |
+    - name: Commit and push changes
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
             echo "Configuring git..."
             git config --global user.name "GitHub Actions"
             git config --global user.email "actions@github.com"
