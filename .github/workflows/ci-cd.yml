@@ -102,6 +102,38 @@ jobs:
     - name: Build
       run: dotnet build src --configuration Release
     
+    - name: Bump version
+      run: |
+        # Читаем текущую версию
+        CURRENT_VERSION=$(cat version)
+        IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+        MAJOR=${VERSION_PARTS[0]}
+        MINOR=${VERSION_PARTS[1]}
+        PATCH=${VERSION_PARTS[2]}
+        
+        # Определяем тип изменения по названию ветки
+        if [[ "$GITHUB_HEAD_REF" == feat/* ]]; then
+          echo "Feature branch detected, bumping minor version"
+          MINOR=$((MINOR + 1))
+          PATCH=0
+        elif [[ "$GITHUB_HEAD_REF" == fix/* ]]; then
+          echo "Fix branch detected, bumping patch version"
+          PATCH=$((PATCH + 1))
+        else
+          echo "No version bump needed for branch $GITHUB_HEAD_REF"
+        fi
+        
+        # Формируем новую версию
+        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+        
+        # Сохраняем новую версию только если она изменилась
+        if [ "$NEW_VERSION" != "$CURRENT_VERSION" ]; then
+          echo "$NEW_VERSION" > version
+          echo "Version bumped from $CURRENT_VERSION to $NEW_VERSION"
+        else
+          echo "Version remains $CURRENT_VERSION"
+        fi
+
     - name: Update changelog
       run: |
         echo "Creating temporary changelog file..."
@@ -130,39 +162,39 @@ jobs:
         echo "Changes:" >> changelog.txt
         [ -f changelog.md ] && tail -n +3 changelog.md >> changelog.txt
         echo "Changelog.txt created successfully"
-    
-    - name: Commit and push changes
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        echo "Configuring git..."
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
         
-        echo "Determining current branch..."
-        CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-        echo "Working on branch: $CURRENT_BRANCH"
-        
-        echo "Adding files to git..."
-        git add changelog.md
-        git add changelog.txt
-        git add version
-        
-        echo "Checking for changes..."
-        if ! git diff-index --quiet HEAD --; then
-          echo "Committing changes..."
-          git commit -m "CI: Update changelog for v$(cat version) [skip ci]"
-          
-          echo "Pulling latest changes..."
-          git pull origin $CURRENT_BRANCH
-          
-          echo "Pushing changes..."
-          git push "https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git" HEAD:$CURRENT_BRANCH
-          
-          echo "Changes pushed successfully to $CURRENT_BRANCH"
-        else
-          echo "No changes to commit"
-        fi
+        - name: Commit and push changes
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          run: |
+            echo "Configuring git..."
+            git config --global user.name "GitHub Actions"
+            git config --global user.email "actions@github.com"
+            
+            echo "Determining current branch..."
+            CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+            echo "Working on branch: $CURRENT_BRANCH"
+            
+            echo "Adding files to git..."
+            git add changelog.md
+            git add changelog.txt
+            git add version
+            
+            echo "Checking for changes..."
+            if ! git diff-index --quiet HEAD --; then
+              echo "Committing changes..."
+              git commit -m "CI: Update changelog for v$(cat version) [skip ci]"
+              
+              echo "Pulling latest changes..."
+              git pull origin $CURRENT_BRANCH
+              
+              echo "Pushing changes..."
+              git push "https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git" HEAD:$CURRENT_BRANCH
+              
+              echo "Changes pushed successfully to $CURRENT_BRANCH"
+            else
+              echo "No changes to commit"
+            fi
 
 #Этап четвертый - сообщение в тг
   notify:
