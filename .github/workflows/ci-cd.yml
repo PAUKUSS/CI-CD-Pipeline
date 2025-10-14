@@ -368,30 +368,34 @@ jobs:
 
 
 #Этап пятый -  жокер хаб)
-  docker_publish:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-  
-      # Шаг диагностики (временный)
-      - name: Debug Docker Hub credentials
-        run: |
-          echo "Docker Hub username: paukuss"
-          echo "Token exists: ${{ secrets.DOCKERHUB_TOKEN != '' }}"
-          echo "Repository: CI-CD-Pipeline"
-  
-      # Исправленный логин
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: paukuss
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-  
-      # Сборка и публикация
-      - name: Build and push Docker image
-        run: |
-          VERSION=$(cat version)
-          echo "Building version: v$VERSION"
-          docker build -t paukuss/ci-cd-pipeline:v$VERSION .
-          docker push paukuss/ci-cd-pipeline:v$VERSION
+docker_publish:
+  needs: build
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: paukuss
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Read and normalize version
+      id: ver
+      shell: bash
+      run: |
+        v=$(tr -d '\r\n ' < version)
+        v=${v#v}
+        if ! [[ "$v" =~ ^[A-Za-z0-9._-]+$ ]]; then
+          echo "Bad version: '$v'"; exit 1
+        fi
+        echo "VERSION=$v" >> $GITHUB_OUTPUT
+
+    - name: Build image
+      run: |
+        echo "Building: paukuss/ci-cd-pipeline:v${{ steps.ver.outputs.VERSION }}"
+        docker build -t paukuss/ci-cd-pipeline:v${{ steps.ver.outputs.VERSION }} .
+
+    - name: Push image
+      run: |
+        docker push paukuss/ci-cd-pipeline:v${{ steps.ver.outputs.VERSION }}
