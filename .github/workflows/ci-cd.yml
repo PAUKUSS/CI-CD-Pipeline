@@ -371,40 +371,25 @@ jobs:
   dockerhub_publish:
     runs-on: ubuntu-latest
     needs: build
-    # не публикуем, если это PR из форка (секреты недоступны)
-    if: >
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name == github.repository
-    env:
-      DOCKER_USER: ${{ secrets.DOCKER_HUB_LOGIN }}
-      DOCKER_PASS: ${{ secrets.DOCKERHUB_TOKEN }}
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check secrets presence (no values printed)
-        run: |
-          [ -n "$DOCKER_USER" ] || { echo "::error::Missing DOCKER_HUB_LOGIN secret"; exit 1; }
-          [ -n "$DOCKER_PASS" ] || { echo "::error::Missing DOCKERHUB_TOKEN secret"; exit 1; }
-
-      - name: Docker CLI login
-        run: |
-          echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+      - name: Docker login
+        run: echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_LOGIN }}" --password-stdin
 
       - name: Read version
         id: ver
         shell: bash
         run: |
-          v=$(tr -d '\r\n ' < version)
-          v=${v#v}
+          v=$(tr -d '\r\n ' < version); v=${v#v}
           echo "VERSION=$v" >> $GITHUB_OUTPUT
 
       - name: Build image
-        run: |
-          docker build -t ${DOCKER_USER}/ci-cd-pipeline:v${{ steps.ver.outputs.VERSION }} .
+        run: docker build -t ${{ secrets.DOCKER_HUB_LOGIN }}/ci-cd-pipeline:v${{ steps.ver.outputs.VERSION }} .
 
       - name: Push image
-        run: |
-          docker push ${DOCKER_USER}/ci-cd-pipeline:v${{ steps.ver.outputs.VERSION }}
+        run: docker push ${{ secrets.DOCKER_HUB_LOGIN }}/ci-cd-pipeline:v${{ steps.ver.outputs.VERSION }}
 
       - name: Add dockerhub label
         if: github.event.pull_request != null
@@ -412,3 +397,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           labels: docker-published
+OKEN }}
+        labels: docker-published
